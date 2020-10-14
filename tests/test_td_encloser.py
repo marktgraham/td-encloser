@@ -63,9 +63,9 @@ class TestTDENCLOSER:
         group_members = results_select['group_no'].value_counts()
 
         assert group_members.loc[1] == 36
-        assert group_members.loc[2] == 33
-        assert group_members.loc[3] == 31
-        assert group_members.loc[4] == 30
+        assert group_members.loc[2] == 30
+        assert group_members.loc[3] == 33
+        assert group_members.loc[4] == 31
 
         group_peaks = (
             results_select
