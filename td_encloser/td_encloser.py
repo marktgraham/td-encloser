@@ -233,10 +233,10 @@ class TDENCLOSER(object):
                         .reset_index(drop=True)
                         .itertuples()):
                     if row2[0] < 10:       # Only check nearest 10 groups
-                        samples = max(
+                        samples = int(max(
                             np.ceil(
                                 (600 * dist[inds][row2[0]] * (dist[inds][row2[0]] + 1)** -2)),
-                                2.0)
+                                2.0))
                         spacing = dist[inds][row2[0]] / samples
 
                         ff_mid = np.array([self.spline(
