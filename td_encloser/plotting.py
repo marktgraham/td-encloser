@@ -52,8 +52,8 @@ class BasePlotting(abc.ABC):
             plt.plot([0, 0], [lim * 0.05, lim * 0.025], color='k')
 
         plt.scatter(
-            -self.gxys['xx'][self.gxys.group_peak == 1],
-            self.gxys['yy'][self.gxys.group_peak == 1],
+            -self.df_gxys.loc[self.gxys.group_peak == 1, 'x'],
+            self.df_gxys.loc[self.gxys.group_peak == 1, 'y'],
             edgecolor='k',
             facecolor='none',
             linewidth=2,
@@ -62,46 +62,46 @@ class BasePlotting(abc.ABC):
 
         inds = np.argsort(
             np.sqrt(
-                self.gxys['xx'][self.gxys.group_peak == 1] ** 2 +
-                self.gxys['yy'][self.gxys.group_peak == 1] ** 2))
+                self.df_gxys.loc[self.gxys.group_peak == 1, 'x'] ** 2 +
+                self.df_gxys.loc[self.gxys.group_peak == 1, 'y'] ** 2))
 
         marker = 'o'
 
-        alpha = np.ones_like(self.gxys['xx'])
+        alpha = np.ones_like(self.df_gxys['x'])
         alpha[
-            (self.gxys.group_no > 1) &
-            (self.gxys.group_no < alpha_group)] = 0.25
+            (self.df_gxys['group_no'] > 1) &
+            (self.df_gxys['group_no'] < alpha_group)] = 0.25
 
         plt.scatter(
-            -self.gxys['xx'][self.gxys.group_no == 0],
-            self.gxys['yy'][self.gxys.group_no == 0],
+            -self.df_gxys['x'][self.df_gxys['group_no'] == 0],
+            self.df_gxys['y'][self.df_gxys['group_no'] == 0],
             c='C0',
             s=30,
             zorder=2,
             marker=marker,
-            alpha=alpha[self.gxys.group_no == 0][0])
+            alpha=alpha[self.df_gxys['group_no'] == 0][0])
         plt.scatter(
-            -self.gxys['xx'][self.gxys.group_no == 1],
-            self.gxys['yy'][self.gxys.group_no == 1],
+            -self.df_gxys['x'][self.df_gxys['group_no'] == 1],
+            self.df_gxys['y'][self.df_gxys['group_no'] == 1],
             c='C1',
             s=30,
             zorder=2,
             marker=marker,
-            alpha=alpha[self.gxys.group_no == 1][0])
+            alpha=alpha[self.df_gxys['group_no'] == 1][0])
 
         marker_ = np.tile(np.array(['o', 's', 'D', '^', 'x']), 2000)
 
         for i, n in enumerate(
                 np.unique(
-                    self.gxys.group_no[self.gxys.group_no > 1])):
-            w = self.gxys.group_no == n
+                    self.df_gxys['group_no'][self.df_gxys['group_no'] > 1])):
+            w = self.df_gxys['group_no'] == n
 
             color = 'C%u' % ((i % 7) + 2)
             marker = marker_[np.floor((i + 2) / 10).astype(int)]
 
             plt.scatter(
-                -self.gxys['xx'][w],
-                self.gxys['yy'][w],
+                -self.df_gxys['x'][w],
+                self.df_gxys['y'][w],
                 c=color,
                 s=30,
                 zorder=2,
@@ -130,16 +130,16 @@ class BasePlotting(abc.ABC):
 
         plt.title(self.title, zorder=6)
 
-        median = np.argsort(self.gxys['xx'])[len(self.gxys['xx']) // 2]
+        median = np.argsort(self.df_gxys['x'])[len(self.df_gxys['x']) // 2]
 
         if center == (0, 0):
             if not self.target:
                 plt.xlim(
-                    self.gxys['xx'][median] - lim,
-                    self.gxys['xx'][median] + lim)
+                    self.df_gxys['x'][median] - lim,
+                    self.df_gxys['x'][median] + lim)
                 plt.ylim(
-                    self.gxys['yy'][median] - lim,
-                    self.gxys['yy'][median] + lim)
+                    self.df_gxys['y'][median] - lim,
+                    self.df_gxys['y'][median] + lim)
 
             else:
                 plt.xlim(-lim, lim)
