@@ -19,7 +19,9 @@ class TestTDENCLOSER:
         values = numpy.vstack([x, y])
 
         # Peform the kernel density estimate
-        xx, yy = numpy.mgrid[xmin:xmax:grid_size * 1j, ymin:ymax:grid_size * 1j].round(5)
+        xx, yy = numpy.mgrid[
+            xmin:xmax:grid_size * 1j,
+            ymin:ymax:grid_size * 1j].round(5)
 
         positions = numpy.vstack([xx.ravel(), yy.ravel()])
 
@@ -39,59 +41,109 @@ class TestTDENCLOSER:
 
         arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 10)
 
-        spline = RectBivariateSpline(numpy.unique(arr_x), numpy.unique(arr_y), ff)
+        spline = RectBivariateSpline(
+            numpy.unique(arr_x), numpy.unique(arr_y), ff)
 
         density_zero = spline(0, 0)[0][0]
 
         numpy.testing.assert_almost_equal(density_zero, 1.60653, decimal=5)
 
-    def test_td_encloser(self):
+    def test_td_encloser_on_simulated_catalogue(self):
+        numpy.random.seed(42)
+        num = 40
+        rad = 0.4
+
+        df = pandas.DataFrame({
+            'x': numpy.hstack((
+                numpy.random.uniform(-rad, rad, num) - 1.5,
+                numpy.random.uniform(-rad, rad, int(num * 0.3)),
+                numpy.random.uniform(-5, 5, 150))),
+            'y': numpy.hstack((
+                numpy.random.uniform(-rad, rad, num) + 0.2,
+                numpy.random.uniform(-rad, rad, int(num * 0.3)),
+                numpy.random.uniform(-5, 5, 150)))})
+
+        arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 10)
+
+        spline = RectBivariateSpline(
+            numpy.unique(arr_x), numpy.unique(arr_y), ff)
+
+        td_encloser = TDENCLOSER(
+            df['x'].values, df['y'].values, spline,
+
+            plot=False, mono=-0.01, target=False)
+
+        results = td_encloser.find_groups()
+
+        self._check_group_members(
+            results, group1=50, group2=14, group3=6, group4=5)
+
+        self.plot_results(results, arr_x, arr_y, ff)
+
+    def _test_td_encloser_on_mock_catalogue(self):
         """ Method to test TD-ENCLOSER. """
 
-        df = pandas.read_csv('../data/Processed/Mock_galaxy_catalogue_test.csv')
+        df = pandas.read_csv('data/processed/Mock_galaxy_catalogue_test.csv')
 
         arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 50)
 
-        spline = RectBivariateSpline(numpy.unique(arr_x), numpy.unique(arr_y), ff)
+        spline = RectBivariateSpline(
+            numpy.unique(arr_x), numpy.unique(arr_y), ff)
 
-        td_encloser = TDENCLOSER(df['x'].values, df['y'].values, spline, plot=False, mono=-0.01, target=False)
+        td_encloser = TDENCLOSER(
+            df['x'].values, df['y'].values, spline,
+            plot=False, mono=-0.01, target=False)
 
-        results = td_encloser.gxys
+        results = td_encloser.find_groups()
 
-        results_select = results.loc[lambda x: ((x['group_no'] <= 4) & (x['group_no'] > 0))]
+        self._check_group_members(
+            results=results, group1=36, group2=30, group3=33, group4=31)
 
-        group_members = results_select['group_no'].value_counts()
+        self.plot_results(results)
 
-        assert group_members.loc[1] == 36
-        assert group_members.loc[2] == 30
-        assert group_members.loc[3] == 33
-        assert group_members.loc[4] == 31
+    def _check_group_members(self, results, **kwargs):
+
+        for group in kwargs:
+            group_no = int(group[5:])
+            group_mem_test = kwargs.get(group)
+            try:
+                assert results.loc[
+                    lambda x: x['group_no'] == group_no, 'group_mem'].iloc[0] \
+                        == group_mem_test
+            except AssertionError:
+                print(results.loc[lambda x: (x['group_peak'] == 1) & (x['group_no'] == group_no)])
+
+    def plot_results(self, df, arr_x, arr_y, ff):
+
+        group_members = df['group_no'].value_counts()
+
+        df_top_4 = df.loc[lambda x: ((x['group_no'] <= 4) & (x['group_no'] > 0))]
 
         group_peaks = (
-            results_select
+            df
             .loc[lambda x: x['group_peak'] == 1]
             .reset_index(drop=True)
             .sort_values('group_no'))
 
         box_size = 3
 
-        fig, axes = plt.subplots(figsize=(10, 10), nrows=2, ncols=2)
+        fig, axes = plt.subplots(figsize=(8, 8), nrows=2, ncols=2)
 
-        for i, group in group_peaks.iterrows():
+        for i, group in group_peaks[:4].iterrows():
             ax = numpy.ravel(axes)[i]
-            ax.set_xlim(group['xx'] - box_size, group['xx'] + box_size)
-            ax.set_ylim(group['yy'] - box_size, group['yy'] + box_size)
+            ax.set_xlim(group['x'] - box_size, group['x'] + box_size)
+            ax.set_ylim(group['y'] - box_size, group['y'] + box_size)
 
-            results_box = (
-                results
-                .loc[lambda x: abs(x['xx'] - group['xx']) <= 3]
-                .loc[lambda x: abs(x['yy'] - group['yy']) <= 3])
+            df_box = (
+                df
+                .loc[lambda x: abs(x['x'] - group['x']) <= 3]
+                .loc[lambda x: abs(x['y'] - group['y']) <= 3])
 
-            for i, group_ in results_box['group_no'].drop_duplicates().reset_index(drop=True).iteritems():
+            for i, group_ in df_box['group_no'].drop_duplicates().reset_index(drop=True).iteritems():
                 for color, edgecolor, s in zip([None, f'C{i}'], ['k', None], [50, 40]):
                     ax.scatter(
-                        results_box.loc[lambda x: (x['group_no'] == group_), 'xx'],
-                        results_box.loc[lambda x: (x['group_no'] == group_), 'yy'],
+                        df_box.loc[lambda x: (x['group_no'] == group_), 'x'],
+                        df_box.loc[lambda x: (x['group_no'] == group_), 'y'],
                         color=color,
                         s=s)
 
