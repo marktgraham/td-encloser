@@ -1,5 +1,6 @@
 import abc
 import time
+import functools
 
 import pandas as pd
 import numpy as np
@@ -7,6 +8,9 @@ import matplotlib.pyplot as plt
 
 
 class BaseTDENCLOSER(abc.ABC):
+
+    def _calculate_density_at_location(self, location):
+        return self.spline(location['x'], location['y'])
 
     def __init__(
             self,
@@ -33,40 +37,10 @@ class BaseTDENCLOSER(abc.ABC):
         :return:
         '''
 
+        self.xx = xx
+        self.yy = yy
+
         self.start = time.time()
-
-        # rotate galaxy coordinates for interpolation....
-        xx_, yy_ = yy.copy(), xx.copy()
-        # Calculate density at each galaxy
-        ff = np.array([spline(y, x) for (y, x) in zip(yy_, xx_)])[:, 0][:, 0]
-
-        # Sort by density in descending order
-        inds = np.argsort(ff)[::-1]
-        self.inds_undo = np.argsort(inds)
-        self.gxys = pd.DataFrame({
-            'xx': xx[inds],
-            'yy': yy[inds],
-            'ff': ff[inds],
-            'group_no': 0,
-            'group_peak': 0})
-        self.ind_0 = np.where(inds == 0)[0][0]       # indice of the target galaxy
-
-        xxx = np.linspace(
-            np.round(np.min(self.gxys['xx'])).astype(int),
-            np.round(np.max(self.gxys['xx'])).astype(int),
-            501)
-        yyy = np.linspace(
-            np.round(np.min(self.gxys['yy'])).astype(int),
-            np.round(np.max(self.gxys['yy'])).astype(int),
-            501)
-        fff = spline(yyy, xxx)
-        xxx, yyy = np.meshgrid(xxx, yyy)
-        xxx, yyy = yyy.copy(), xxx.copy()         # rotate grid for contours
-
-        self.contours = pd.DataFrame({
-            'x': xxx.ravel(),
-            'y': yyy.ravel(),
-            'f': fff.ravel()})
 
         self.spline = spline
         self.plot = plot
@@ -81,3 +55,63 @@ class BaseTDENCLOSER(abc.ABC):
         self.pause = True if plot == 'verbose' else False
         self.mono = mono
         self.array = np.zeros(1)
+
+    @property
+    @functools.lru_cache()
+    def df_gxys(self):
+        df_gxys = pd.DataFrame({'x': self.xx, 'y': self.yy})
+
+        # Calculate density at each galaxy
+        df_gxys['density'] = (
+            df_gxys
+            .apply(self._calculate_density_at_location, axis=1)
+            .apply(lambda x: x[0][0]))
+
+        df_gxys = (
+            df_gxys
+            .assign(
+                # add density rank
+                density_rank=lambda x: x['density'].rank(ascending=False),
+                group_no=0,
+                group_peak=False)
+            .sort_values(['density_rank'])
+            .reset_index(drop=True))
+
+        return df_gxys
+
+    @property
+    @functools.lru_cache()
+    def ind_target(self):
+        # need to check this
+        return self.df_gxys.loc[lambda x: x['density_rank'] == x['density_rank'].max()].index
+
+    @property
+    @functools.lru_cache()
+    def df_grid(self):
+        df_grid = pd.DataFrame({
+            'x': np.linspace(
+                np.round(np.min(self.df_gxys['x'])).astype(int),
+                np.round(np.max(self.df_gxys['x'])).astype(int),
+                501),
+            'y': np.linspace(
+                np.round(np.min(self.df_gxys['y'])).astype(int),
+                np.round(np.max(self.df_gxys['y'])).astype(int),
+                501)
+        })
+
+        df_grid['density'] = df_grid.apply(self._calculate_density_at_location, axis=1)
+
+        return df_grid
+
+    @property
+    @functools.lru_cache()
+    def df_contours(self):
+        # rotate grid for contours
+        yyy, xxx = np.meshgrid(self.df_grid['x'], self.df_grid['y'])
+
+        breakpoint()
+
+        return pd.DataFrame({
+            'x': xxx.ravel(),
+            'y': yyy.ravel(),
+            'f': self.df_grid['density'].ravel()})
