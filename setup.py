@@ -13,6 +13,7 @@ setuptools.setup(
         'pandas>=1.1.0',
         'matplotlib>=3.3.0',
         'tqdm>=4.48.2',
-        'scipy>=1.1.0'
+        'scipy==1.1.0',
+        'pytest>=6.0.1'
     ]
 )
