@@ -17,6 +17,37 @@ class TDENCLOSER(
         BaseSecondPass,
         BasePlotting):
 
+    def _assign_group_mems(self):
+        # add column with group members
+        self.df_gxys['group_mem'] = np.select(
+            [self.df_gxys['group_no'] != 0, self.df_gxys['group_no'] == 0],
+            [self.df_gxys.groupby(['group_no'])['group_peak'].transform('count').values, 1])
+
+        # set all galaxies with group_mem = 1 to group 0
+        self.df_gxys['group_no'] = np.select(
+            [self.df_gxys['group_mem'] == 1, self.df_gxys['group_mem'] != 1],
+            [0, self.df_gxys['group_no']])
+
+        self.df_gxys['group_peak'] = np.select(
+            [self.df_gxys['group_no'] == 0, self.df_gxys['group_mem'] != 0],
+            [False, self.df_gxys['group_peak']])
+
+    def _assign_final_group_no(self):
+        group_mapping = (
+            self.df_gxys
+            .loc[lambda x: x['group_peak'] == True]
+            .sort_values(['group_mem', 'density_rank'], ascending=[False, True])
+            .reset_index(drop=True)
+            .reset_index()
+            .assign(group_no_new=lambda x: x['index'] + 1)
+            .set_index('group_no')
+            ['group_no_new']
+            .to_dict())
+
+        group_mapping[0] = 0
+
+        self.df_gxys['group_no'] = self.df_gxys['group_no'].map(group_mapping)
+
     def find_groups(self):
 
         if self.plot:
@@ -26,29 +57,29 @@ class TDENCLOSER(
 
         # If target galaxy is above delta_outer...
         if ((
-                self.gxys.ff.iloc[self.ind_0] >= self.delta_outer)
+                self.df_gxys['density'].iloc[self.ind_target].item() >= self.delta_outer)
                 & self.target) | (not self.target):
-            self.gxys.at[0, 'group_no'], self.gxys.at[0, 'group_peak'] = 1, 1
+            self.df_gxys.loc[0, 'group_no'], self.df_gxys.loc[0, 'group_peak'] = 1, True
             print('Starting first pass...')
-            w = self.gxys.index.values > 0
+            w = self.df_gxys.index.values > 0
             self.run_first_pass(selection=w, min_group_no=0)
             print('Completed in %.1f seconds' % (time.time() - self.start))
 
         else:
-            self.gxys.at[self.ind_0, 'group_no'] = 1
+            self.df_gxys.loc[self.ind_target, 'group_no'] = 1
             self.grps = pd.DataFrame(
                 {
                     'x': 0,
                     'y': 0,
-                    'f': self.gxys.ff.iloc[self.ind_0],
+                    'f': self.df_gxys['density'].iloc[self.ind_target],
                     'group_no': 1},
                 index=[0])
 
-        if (self.gxys.group_no.iloc[self.ind_0] > 1) & (self.target):
-            w = self.gxys.group_no == self.gxys.group_no.iloc[self.ind_0]
-            ww = self.gxys.group_no == 1
-            self.gxys.at[ww, 'group_no'] = self.gxys.group_no.iloc[self.ind_0]
-            self.gxys.at[w, 'group_no'] = 1
+        if (self.df_gxys['group_no'].iloc[self.ind_target].item() > 1) & (self.target):
+            w = self.df_gxys['group_no'] == self.df_gxys['group_no'].iloc[self.ind_target]
+            ww = self.df_gxys['group_no'] == 1
+            self.df_gxys.loc[ww, 'group_no'] = self.df_gxys['group_no'].iloc[self.ind_target]
+            self.df_gxys.loc[w, 'group_no'] = 1
 
         if self.plot:
             self.title = 'First Pass'
@@ -61,14 +92,14 @@ class TDENCLOSER(
             plt.subplot(132)
 
         if self.target:
-            if self.gxys.group_no.iloc[self.ind_0] == 1:
+            if self.df_gxys['group_no'].iloc[self.ind_target] == 1:
                 print('Target galaxy is in a group')
-            elif self.gxys.group_no.iloc[self.ind_0] == 0:
+            elif self.df_gxys['group_no'].iloc[self.ind_target] == 0:
                 print('Target galaxy is isolated')
 
         # Second pass: Break up Group 1
 
-        if np.sum(self.gxys.group_no == 1) != 1:
+        if np.sum(self.df_gxys['group_no'] == 1) != 1:
             # For groups where the peak is greater than delta_saddle,
             # select galaxies below delta_saddle (and above delta outer)
             self.run_second_pass()
@@ -80,12 +111,12 @@ class TDENCLOSER(
             plt.subplot(133)
 
         # Select galaxies between delta_outer and delta_saddle
-        w_saddle = (self.gxys.group_no == 0) & (self.gxys.ff >= self.delta_outer)
+        w_saddle = (self.df_gxys['group_no'] == 0) & (self.df_gxys['density'] >= self.delta_outer)
 
         if np.sum(w_saddle):  # If such galaxies exist
             print('Attempting to form new groups from %u remaining galaxies...' % np.sum(w_saddle))
 
-            max_group_no = np.max(self.gxys.group_no)
+            max_group_no = np.max(self.df_gxys['group_no'])
             print('Starting third pass...')
             self.title = 'Third Pass: Forming New Groups with Remaining Galaxies...'
             self.run_first_pass(
@@ -94,26 +125,26 @@ class TDENCLOSER(
                 cap=False)
 
             if self.target:
-                if self.gxys.group_no[self.ind_0] == 1:
+                if self.df_gxys['group_no'][self.ind_target] == 1:
                     print('Target galaxy is in a new group')
-                elif self.gxys.group_no[self.ind_0] == 0:
+                elif self.df_gxys['group_no'][self.ind_target] == 0:
                     print('Target galaxy is still isolated')
         else:
             max_group_no = 0
 
         if self.target:
-            if self.gxys.group_no[self.ind_0] != 1:
-                w = self.gxys.group_no == 1
-                ww = self.gxys.group_no == self.gxys.group_no[self.ind_0]
-                self.gxys.at[w, 'group_no'] = self.gxys.group_no[self.ind_0]
-                self.gxys.at[ww, 'group_no'] = 1
+            if self.df_gxys['group_no'][self.ind_target] != 1:
+                w = self.df_gxys['group_no'] == 1
+                ww = self.df_gxys['group_no'] == self.df_gxys['group_no'][self.ind_target]
+                self.df_gxys.loc[w, 'group_no'] = self.df_gxys['group_no'][self.ind_target]
+                self.df_gxys.loc[ww, 'group_no'] = 1
 
-        assert np.sum(self.gxys.group_no == 1) > 0, 'Problem!'
+        assert np.sum(self.df_gxys['group_no'] == 1) > 0, 'Problem!'
         if self.target:
-            assert self.gxys.group_no.iloc[self.ind_0] == 1, 'Problem!'
+            assert self.df_gxys['group_no'].iloc[self.ind_target] == 1, 'Problem!'
         assert np.sum(
-            (self.gxys.ff >= self.delta_outer) &
-            (self.gxys.group_no == 0)) == 0, 'Problem!'
+            (self.df_gxys['density'] >= self.delta_outer) &
+            (self.df_gxys['group_no'] == 0)) == 0, 'Problem!'
 
         if self.plot:
             self.title = 'Third Pass'
@@ -131,8 +162,13 @@ class TDENCLOSER(
             plt.savefig(self.file + '.pdf')
 
         print('Found %u groups in %.1f seconds' % (
-            len(np.unique(self.gxys.group_no)), time.time() - self.start))
+            len(np.unique(self.df_gxys['group_no'])), time.time() - self.start))
 
-        self.gxys = self.gxys.iloc[self.inds_undo].reset_index(drop=True)
+        self._assign_group_mems()
 
-        return self.gxys
+        self._assign_final_group_no()
+
+        return (
+            self.df_gxys
+            .sort_values(['group_no', 'density_rank'], ascending=[True, True])
+            .reset_index(drop=True))

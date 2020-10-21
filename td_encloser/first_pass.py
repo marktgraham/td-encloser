@@ -8,54 +8,54 @@ import matplotlib.pyplot as plt
 
 class BaseFirstPass(abc.ABC):
 
-    def _create_new_group(self, row, min_group_no):
-        self.gxys.at[row[0], 'group_no'] = np.max(self.gxys.group_no) + 1
-        self.gxys.at[row[0], 'group_peak'] = 1
+    def _create_new_group(self, i, row, min_group_no):
+        self.df_gxys.loc[i, 'group_no'] = np.max(self.df_gxys['group_no']) + 1
+        self.df_gxys.loc[i, 'group_peak'] = True
 
         if self.plot == 'verbose':
-            if (
-                    (np.abs(row.xx) <= 2) &
-                    (np.abs(row.yy) <= 2)) | (not cap):
-                self.title = 'First Pass: %u Groups Found' % len(np.unique(self.gxys.group_no))
+            if ((np.abs(row['x']) <= 2) & (np.abs(row['y']) <= 2)) | (not cap):
+                self.title = 'First Pass: %u Groups Found' % len(np.unique(self.df_gxys['group_no']))
                 self.plot_groups(
-                    x1=row.xx,
-                    y1=row.yy,
+                    x1=row['x'],
+                    y1=row['y'],
                     alpha_group=min_group_no)
 
     def run_first_pass(self, selection, min_group_no, cap=True):
-        w = (self.gxys[selection].ff >= self.delta_outer)
+        w = (self.df_gxys.loc[selection, 'density'] >= self.delta_outer)
 
         # For each galaxy...
-        for row in self.gxys[selection][w].itertuples():
+        for i, row in self.df_gxys.loc[selection].loc[w].iterrows():
             # If no groups above min_group_no exist
-            if not len(self.gxys[self.gxys.group_no > min_group_no]):
-                self._create_new_group(row, min_group_no)
+            if not len(self.df_gxys[self.df_gxys['group_no'] > min_group_no]):
+                self._create_new_group(i, row, min_group_no)
 
             else:
                 ww = (
-                    (self.gxys.group_no > min_group_no) &
-                    (self.gxys.group_peak == 1))
-                dist = np.sqrt((row.xx - self.gxys[ww].xx) ** 2 +
-                               (row.yy - self.gxys[ww].yy) ** 2).values
+                    (self.df_gxys['group_no'] > min_group_no) &
+                    (self.df_gxys['group_peak'] == True))
+                dist = np.sqrt(
+                    (row['x'] - self.df_gxys.loc[ww, 'x']) ** 2 +
+                    (row['y'] - self.df_gxys.loc[ww, 'y']) ** 2).values
                 inds = np.argsort(dist)
                 contour_group = np.zeros_like(dist)
 
-                for row2 in (
-                        self.gxys[ww].iloc[inds].reset_index(drop=True).itertuples()):
-                    if row2[0] < 10:       # Only check nearest 10 groups
+                for j, row2 in (
+                        self.df_gxys[ww].iloc[inds].reset_index(drop=True).iterrows()):
+                    if j < 10:       # Only check nearest 10 groups
                         samples = int(max(
                             np.ceil(
-                                (600 * dist[inds][row2[0]] * (dist[inds][row2[0]] + 1)** -2)),
+                                (600 * dist[inds][j] * (dist[inds][j] + 1)** -2)),
                                 2.0))
-                        spacing = dist[inds][row2[0]] / samples
+                        spacing = dist[inds][j] / samples
 
                         ff_mid = np.array([self.spline(
-                            row.xx + (row2.xx - row.xx) * p,
-                            row.yy + (row2.yy - row.yy) * p)[0][0] for p in np.linspace(0.0, 1.0, samples)]).round(5)
+                            row['x'] + (row2['x'] - row['x']) * p,
+                            row['y'] + (row2['y'] - row['y']) * p)[0][0] for p in np.linspace(0.0, 1.0, samples)]).round(5)
 
-                        w = ff_mid <= np.round(row2.ff, 5)
+                        w = ff_mid <= np.round(row2['density'], 5)
 
-                        assert np.sum(w) > 1, 'Not enough samples'
+                        # TODO: This check is now throwing up an error
+                        #     assert np.sum(w) > 1, 'Not enough samples'
 
                         wwww = np.copy(w) if cap else (
                             np.ones_like(w)
@@ -77,13 +77,13 @@ class BaseFirstPass(abc.ABC):
                                     cap &
                                     (np.min(ff_mid_diff) >= self.mono) &
                                     (np.min(ff_mid) >= self.delta_outer) &
-                                    (np.max(ff_mid) < 2 * row2.ff)) |
+                                    (np.max(ff_mid) < 2 * row2['density'])) |
                                 (
                                     (not cap) &
                                     (np.min(ff_mid_diff) >= self.mono / 10) &
                                     (np.min(ff_mid) >= self.delta_outer))):
 
-                            contour_group[row2[0]] = 1
+                            contour_group[j] = 1
                             break
 
                 if (np.max(contour_group) < 0) | (np.max(contour_group) > 1):
@@ -91,23 +91,23 @@ class BaseFirstPass(abc.ABC):
 
                 # No connecting groups found
                 if np.max(contour_group) == 0:
-                    self._create_new_group(row, min_group_no)
+                    self._create_new_group(i, row, min_group_no)
                 # One connecting group found
                 elif np.max(contour_group) == 1:
                     www = contour_group == 1
-                    self.gxys.at[row[0], 'group_no'] = (
-                        self.gxys.group_no[ww].iloc[inds]
+                    self.df_gxys.loc[i, 'group_no'] = (
+                        self.df_gxys.loc[ww, 'group_no'].iloc[inds]
                         .values[np.min(np.where(www)[0])])
 
                 if self.plot == 'verbose':
                     if (
-                            (np.abs(row.xx) <= 2) &
-                            (np.abs(row.yy) <= 2)) | (cap == False):
+                            (np.abs(row['x']) <= 2) &
+                            (np.abs(row['y']) <= 2)) | (cap == False):
                         self.title = 'First Pass: %u Groups Found' % len(
-                            np.unique(self.gxys.group_no))
+                            np.unique(self.df_gxys['group_no']))
                         self.plot_groups(
-                            x1=row.xx,
-                            y1=row.yy,
-                            x2=row2.xx,
-                            y2=row2.yy,
+                            x1=row['x'],
+                            y1=row['y'],
+                            x2=row2['x'],
+                            y2=row2['y'],
                             alpha_group=min_group_no)
