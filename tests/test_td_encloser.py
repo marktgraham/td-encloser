@@ -180,7 +180,7 @@ class TestOnSimulatedCatalogue(BaseTestTDENCLOSER):
             group1=50, group2=14, group3=6, group4=5)
 
 
-class TestOnMockCatalogue(BaseTestTDENCLOSER):
+class _TestOnMockCatalogue(BaseTestTDENCLOSER):
     """ Class to test TD-ENCLOSER on a mock catalogue. """
 
     def setup(self):

@@ -11,28 +11,36 @@ class BaseSecondPass(abc.ABC):
     def run_second_pass(self):
         # For groups above delta saddle, select galaxies between delta outer
         # and delta saddle
-        w = (
+        between_delta_outer_delta_saddle = (
             (self.df_gxys['density'] >= self.delta_outer) &
             (self.df_gxys['density'] < self.delta_saddle) &
             np.isin(self.df_gxys['group_no'], self.df_gxys.loc[
                 (self.df_gxys['density'] >= self.delta_peak) &
                 (self.df_gxys['group_peak'] == 1), 'group_no']))
 
-        if np.sum(w):  # If such galaxies exist
+        if between_delta_outer_delta_saddle.sum():  # If such galaxies exist
             print(
                 f'Attempting to add {w.sum()} remaining galaxies to existing '
                 'groups...')
             # Second pass: see if they can join existing groups
-            for i, row in self.df_gxys[w].iterrows():
+            for i, row in (
+                    self.df_gxys
+                    .loc[between_delta_outer_delta_saddle]
+                    .iterrows()):
                 dist = np.sqrt(
                     (row['x'] - self.df_gxys['x']) ** 2 +
                     (row['y'] - self.df_gxys['y']) ** 2)
                 inds = np.argsort(dist)  # Sort by distance
-                ww = self.df_gxys['group_no'].iloc[inds][:self.n_merge] != 0
+
+                neighbours_in_different_group = (
+                    self.df_gxys
+                    ['group_no']
+                    .iloc[inds]
+                    [:self.n_merge] != 0)
 
                 # If at least one of the nearest n_merge - 1 neighbours is in
                 # a different group...
-                if np.sum(ww):
+                if neighbours_in_different_group.sum():
                     near_max = (
                         self.df_gxys
                         .loc[inds, 'density']
@@ -41,7 +49,7 @@ class BaseSecondPass(abc.ABC):
 
                     if self.plot == 'verbose':
                         self.title = 'Second Pass: Chopping Border Galaxies...'
-                        if (np.abs(row['x']) <= 2) & (np.abs(row['y']) <= 2):
+                        if (row['x'].abs() <= 2) & (row['y'].abs() <= 2):
                             self.plot_groups(
                                 x1=row['x'],
                                 y1=row['y'],

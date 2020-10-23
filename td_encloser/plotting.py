@@ -72,42 +72,34 @@ class BasePlotting(abc.ABC):
             (self.df_gxys['group_no'] > 1) &
             (self.df_gxys['group_no'] < alpha_group)] = 0.25
 
-        plt.scatter(
-            -self.df_gxys['x'][self.df_gxys['group_no'] == 0],
-            self.df_gxys['y'][self.df_gxys['group_no'] == 0],
-            c='C0',
-            s=30,
-            zorder=2,
-            marker=marker,
-            alpha=alpha[self.df_gxys['group_no'] == 0][0])
-        plt.scatter(
-            -self.df_gxys['x'][self.df_gxys['group_no'] == 1],
-            self.df_gxys['y'][self.df_gxys['group_no'] == 1],
-            c='C1',
-            s=30,
-            zorder=2,
-            marker=marker,
-            alpha=alpha[self.df_gxys['group_no'] == 1][0])
+        for group_no in [0, 1]:
+            plt.scatter(
+                -self.df_gxys.loc[lambda x: x['group_no'] == group_no, 'x'],
+                self.df_gxys.loc[lambda x: x['group_no'] == group_no, 'y'],
+                c=f'C{group_no}',
+                s=30,
+                zorder=2,
+                marker=marker,
+                alpha=alpha[self.df_gxys['group_no'] == group_no][0])
 
         marker_ = np.tile(np.array(['o', 's', 'D', '^', 'x']), 2000)
 
-        for i, n in enumerate(
-                np.unique(
-                    self.df_gxys['group_no'][self.df_gxys['group_no'] > 1])):
-            w = self.df_gxys['group_no'] == n
+        for i, group_no in enumerate(
+                self.df_gxys.loc[lambda x: x['group_no'] > 1, 'group_no']):
+            group = self.df_gxys['group_no'] == group_no
 
-            color = 'C%u' % ((i % 7) + 2)
+            color = f'C{(i % 7) + 2}'
             marker = marker_[np.floor((i + 2) / 10).astype(int)]
 
             plt.scatter(
-                -self.df_gxys['x'][w],
-                self.df_gxys['y'][w],
+                -self.df_gxys.loc[group, 'x'],
+                self.df_gxys.loc[group, 'y'],
                 c=color,
                 s=30,
                 zorder=2,
                 marker=marker,
-                label='Group %u: %u' % (n, np.sum(w)),
-                alpha=alpha[w][0])
+                label=f'Group {group_no}: {group.sum()}',
+                alpha=alpha[group][0])
 
         if (x1 != '') & (y1 != '') & (x2 != '') & (y2 != ''):
             plt.plot(

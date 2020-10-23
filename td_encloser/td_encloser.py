@@ -71,9 +71,9 @@ class TDENCLOSER(
             self.df_gxys.loc[0, 'group_no'] = 1
             self.df_gxys.loc[0, 'group_peak'] = True
             print('Starting first pass...')
-            w = self.df_gxys.index.values > 0
-            self.run_first_pass(selection=w, min_group_no=0)
-            print('Completed in %.1f seconds' % (time.time() - self.start))
+            selection = self.df_gxys.index.values > 0
+            self.run_first_pass(selection=selection, min_group_no=0)
+            print(f'Completed in {(time.time() - self.start):.1f} seconds')
 
         else:
             self.df_gxys.loc[self.ind_target, 'group_no'] = 1
@@ -88,12 +88,12 @@ class TDENCLOSER(
         if (
                 (self.df_gxys['group_no'].iloc[self.ind_target].item() > 1) &
                 (self.target)):
-            w = self.df_gxys['group_no'] == \
+            target = self.df_gxys['group_no'] == \
                 self.df_gxys['group_no'].iloc[self.ind_target]
-            ww = self.df_gxys['group_no'] == 1
-            self.df_gxys.loc[ww, 'group_no'] = \
+            group_one = self.df_gxys['group_no'] == 1
+            self.df_gxys.loc[group_one, 'group_no'] = \
                 self.df_gxys['group_no'].iloc[self.ind_target]
-            self.df_gxys.loc[w, 'group_no'] = 1
+            self.df_gxys.loc[target, 'group_no'] = 1
 
         if self.plot:
             self.title = 'First Pass'
@@ -113,7 +113,7 @@ class TDENCLOSER(
 
         # Second pass: Break up Group 1
 
-        if np.sum(self.df_gxys['group_no'] == 1) != 1:
+        if (self.df_gxys['group_no'] == 1).sum() != 1:
             # For groups where the peak is greater than delta_saddle,
             # select galaxies below delta_saddle (and above delta outer)
             self.run_second_pass()
@@ -125,21 +125,21 @@ class TDENCLOSER(
             plt.subplot(133)
 
         # Select galaxies between delta_outer and delta_saddle
-        w_saddle = (
+        between_delta_outer_saddle = (
             (self.df_gxys['group_no'] == 0) &
             (self.df_gxys['density'] >= self.delta_outer))
 
-        if np.sum(w_saddle):  # If such galaxies exist
+        if between_delta_outer_saddle.sum():  # If such galaxies exist
             print(
-                f'Attempting to form new groups from {w_saddle} '
-                'remaining galaxies...')
+                'Attempting to form new groups from '
+                f'{between_delta_outer_saddle} remaining galaxies...')
 
-            max_group_no = np.max(self.df_gxys['group_no'])
+            max_group_no = self.df_gxys['group_no'].max()
             print('Starting third pass...')
             self.title = \
                 'Third Pass: Forming New Groups with Remaining Galaxies...'
             self.run_first_pass(
-                selection=w_saddle,
+                selection=between_delta_outer_saddle,
                 min_group_no=max_group_no + 1,
                 cap=False)
 
@@ -153,12 +153,12 @@ class TDENCLOSER(
 
         if self.target:
             if self.df_gxys['group_no'][self.ind_target] != 1:
-                w = self.df_gxys['group_no'] == 1
-                ww = self.df_gxys['group_no'] == \
+                group_one = self.df_gxys['group_no'] == 1
+                target = self.df_gxys['group_no'] == \
                     self.df_gxys['group_no'].iloc[self.ind_target]
-                self.df_gxys.loc[w, 'group_no'] = \
+                self.df_gxys.loc[group_one, 'group_no'] = \
                     self.df_gxys['group_no'].iloc[self.ind_target]
-                self.df_gxys.loc[ww, 'group_no'] = 1
+                self.df_gxys.loc[target, 'group_no'] = 1
 
         assert np.sum(self.df_gxys['group_no'] == 1) > 0, 'Problem!'
         if self.target:
