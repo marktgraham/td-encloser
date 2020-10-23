@@ -20,8 +20,8 @@ class BaseSecondPass(abc.ABC):
 
         if between_delta_outer_delta_saddle.sum():  # If such galaxies exist
             print(
-                f'Attempting to add {w.sum()} remaining galaxies to existing '
-                'groups...')
+                f'Attempting to add {between_delta_outer_delta_saddle.sum()} '
+                'remaining galaxies to existing groups...')
             # Second pass: see if they can join existing groups
             for i, row in (
                     self.df_gxys

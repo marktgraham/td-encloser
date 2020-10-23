@@ -40,7 +40,7 @@ class TDENCLOSER(
     def _assign_final_group_no(self):
         group_mapping = (
             self.df_gxys
-            .loc[lambda x: x['group_peak'] is True]
+            .loc[lambda x: x['group_peak'] == 1]
             .sort_values(
                 ['group_mem', 'density_rank'],
                 ascending=[False, True])

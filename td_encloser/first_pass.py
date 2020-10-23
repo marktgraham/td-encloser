@@ -37,7 +37,7 @@ class BaseFirstPass(abc.ABC):
             else:
                 group_peaks = (
                     (self.df_gxys['group_no'] > min_group_no) &
-                    (self.df_gxys['group_peak'] is True))
+                    (self.df_gxys['group_peak']))
                 dist = np.sqrt(
                     (row['x'] - self.df_gxys.loc[group_peaks, 'x']) ** 2 +
                     (row['y'] - self.df_gxys.loc[group_peaks, 'y']) ** 2).values
@@ -50,6 +50,7 @@ class BaseFirstPass(abc.ABC):
                         .iloc[inds]
                         .reset_index(drop=True)
                         .iterrows()):
+
                     if j < 10:       # Only check nearest 10 groups
                         samples = int(max(
                             np.ceil((
