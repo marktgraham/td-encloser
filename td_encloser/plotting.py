@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 
 class BasePlotting(abc.ABC):
+    """ Class holding methods to produce pretty plotsss. """
 
     def plot_groups(
             self,
@@ -20,6 +21,7 @@ class BasePlotting(abc.ABC):
             alpha_group=1,
             legend=False,
             pause=False):
+        """ Method to visualise the groups. """
         ax = plt.gca()
         ax.clear()
 

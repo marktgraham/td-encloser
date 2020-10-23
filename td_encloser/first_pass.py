@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 
 
 class BaseFirstPass(abc.ABC):
+    """ Class holding methods to run the first pass. """
 
     def _create_new_group(self, i, row, min_group_no):
+        """ Method to create a new group. """
         self.df_gxys.loc[i, 'group_no'] = self.df_gxys['group_no'].max() + 1
         self.df_gxys.loc[i, 'group_peak'] = True
 
@@ -24,6 +26,7 @@ class BaseFirstPass(abc.ABC):
                     alpha_group=min_group_no)
 
     def run_first_pass(self, selection, min_group_no, cap=True):
+        """ Method to run the first pass. """
         # For each galaxy...
         for i, row in (
                 self.df_gxys

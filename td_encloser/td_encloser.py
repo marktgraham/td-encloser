@@ -16,8 +16,10 @@ class TDENCLOSER(
         BaseFirstPass,
         BaseSecondPass,
         BasePlotting):
+    """ Class holding methods to run TD-ENCLOSER. """
 
     def _assign_group_mems(self):
+        """ Method to assign group membership to groups. """
         # add column with group members
         self.df_gxys['group_mem'] = np.select(
             [self.df_gxys['group_no'] != 0, self.df_gxys['group_no'] == 0],
@@ -38,6 +40,7 @@ class TDENCLOSER(
             [False, self.df_gxys['group_peak']])
 
     def _assign_final_group_no(self):
+        """ Method to assign a final group number. """
         group_mapping = (
             self.df_gxys
             .loc[lambda x: x['group_peak'] == 1]
@@ -56,6 +59,7 @@ class TDENCLOSER(
         self.df_gxys['group_no'] = self.df_gxys['group_no'].map(group_mapping)
 
     def find_groups(self):
+        """ Method to run TD-ENCLOSER. """
 
         if self.plot:
             plt.figure(figsize=(12, 4))

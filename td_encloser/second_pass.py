@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 
 
 class BaseSecondPass(abc.ABC):
+    """ Class holding methods to run the seconddd pass. """
 
     def run_second_pass(self):
+        """ Method to run the second pass. """
         # For groups above delta saddle, select galaxies between delta outer
         # and delta saddle
         between_delta_outer_delta_saddle = (

@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 
 
 class BaseTDENCLOSER(abc.ABC):
+    """ Base class for TD-ENCLOSER. """
 
     def _calculate_density_at_location(self, location):
+        """ Method to return the density at a location. """
         return self.spline(location['x'], location['y'])
 
     def __init__(
@@ -61,6 +63,8 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def df_gxys(self):
+        """ Method to return a DataFrame representation of the galaxy
+        catalogue. """
         df_gxys = pd.DataFrame({'x': self.xx, 'y': self.yy})
 
         # Calculate density at each galaxy
@@ -84,6 +88,7 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def ind_target(self):
+        """ Method to return the index of the target galaxy. """
         # need to check this
         return (
             self.df_gxys
@@ -93,6 +98,7 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def df_grid(self):
+        """ Method to return a DataFrame of a grid for contours. """
         df_grid = pd.DataFrame({
             'x': np.linspace(
                 np.round(np.min(self.df_gxys['x'])).astype(int),
@@ -113,6 +119,7 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def df_contours(self):
+        """ Method to return a DataFrame of density. """
         # rotate grid for contours
         yyy, xxx = np.meshgrid(self.df_grid['x'], self.df_grid['y'])
 
