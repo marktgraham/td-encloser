@@ -21,7 +21,12 @@ class TDENCLOSER(
         # add column with group members
         self.df_gxys['group_mem'] = np.select(
             [self.df_gxys['group_no'] != 0, self.df_gxys['group_no'] == 0],
-            [self.df_gxys.groupby(['group_no'])['group_peak'].transform('count').values, 1])
+            [
+                self.df_gxys
+                .groupby(['group_no'])
+                ['group_peak']
+                .transform('count')
+                .values, 1])
 
         # set all galaxies with group_mem = 1 to group 0
         self.df_gxys['group_no'] = np.select(
@@ -35,8 +40,10 @@ class TDENCLOSER(
     def _assign_final_group_no(self):
         group_mapping = (
             self.df_gxys
-            .loc[lambda x: x['group_peak'] == True]
-            .sort_values(['group_mem', 'density_rank'], ascending=[False, True])
+            .loc[lambda x: x['group_peak'] is True]
+            .sort_values(
+                ['group_mem', 'density_rank'],
+                ascending=[False, True])
             .reset_index(drop=True)
             .reset_index()
             .assign(group_no_new=lambda x: x['index'] + 1)
@@ -55,11 +62,14 @@ class TDENCLOSER(
             plt.subplot(131)
             plt.ylabel('y (Mpc)')
 
+        target_density = self.df_gxys['density'].iloc[self.ind_target].item()
+
         # If target galaxy is above delta_outer...
-        if ((
-                self.df_gxys['density'].iloc[self.ind_target].item() >= self.delta_outer)
-                & self.target) | (not self.target):
-            self.df_gxys.loc[0, 'group_no'], self.df_gxys.loc[0, 'group_peak'] = 1, True
+        if (
+                ((target_density >= self.delta_outer) & self.target) |
+                (not self.target)):
+            self.df_gxys.loc[0, 'group_no'] = 1
+            self.df_gxys.loc[0, 'group_peak'] = True
             print('Starting first pass...')
             w = self.df_gxys.index.values > 0
             self.run_first_pass(selection=w, min_group_no=0)
@@ -75,10 +85,14 @@ class TDENCLOSER(
                     'group_no': 1},
                 index=[0])
 
-        if (self.df_gxys['group_no'].iloc[self.ind_target].item() > 1) & (self.target):
-            w = self.df_gxys['group_no'] == self.df_gxys['group_no'].iloc[self.ind_target]
+        if (
+                (self.df_gxys['group_no'].iloc[self.ind_target].item() > 1) &
+                (self.target)):
+            w = self.df_gxys['group_no'] == \
+                self.df_gxys['group_no'].iloc[self.ind_target]
             ww = self.df_gxys['group_no'] == 1
-            self.df_gxys.loc[ww, 'group_no'] = self.df_gxys['group_no'].iloc[self.ind_target]
+            self.df_gxys.loc[ww, 'group_no'] = \
+                self.df_gxys['group_no'].iloc[self.ind_target]
             self.df_gxys.loc[w, 'group_no'] = 1
 
         if self.plot:
@@ -111,14 +125,19 @@ class TDENCLOSER(
             plt.subplot(133)
 
         # Select galaxies between delta_outer and delta_saddle
-        w_saddle = (self.df_gxys['group_no'] == 0) & (self.df_gxys['density'] >= self.delta_outer)
+        w_saddle = (
+            (self.df_gxys['group_no'] == 0) &
+            (self.df_gxys['density'] >= self.delta_outer))
 
         if np.sum(w_saddle):  # If such galaxies exist
-            print('Attempting to form new groups from %u remaining galaxies...' % np.sum(w_saddle))
+            print(
+                f'Attempting to form new groups from {w_saddle} '
+                'remaining galaxies...')
 
             max_group_no = np.max(self.df_gxys['group_no'])
             print('Starting third pass...')
-            self.title = 'Third Pass: Forming New Groups with Remaining Galaxies...'
+            self.title = \
+                'Third Pass: Forming New Groups with Remaining Galaxies...'
             self.run_first_pass(
                 selection=w_saddle,
                 min_group_no=max_group_no + 1,
@@ -135,13 +154,16 @@ class TDENCLOSER(
         if self.target:
             if self.df_gxys['group_no'][self.ind_target] != 1:
                 w = self.df_gxys['group_no'] == 1
-                ww = self.df_gxys['group_no'] == self.df_gxys['group_no'][self.ind_target]
-                self.df_gxys.loc[w, 'group_no'] = self.df_gxys['group_no'][self.ind_target]
+                ww = self.df_gxys['group_no'] == \
+                    self.df_gxys['group_no'].iloc[self.ind_target]
+                self.df_gxys.loc[w, 'group_no'] = \
+                    self.df_gxys['group_no'].iloc[self.ind_target]
                 self.df_gxys.loc[ww, 'group_no'] = 1
 
         assert np.sum(self.df_gxys['group_no'] == 1) > 0, 'Problem!'
         if self.target:
-            assert self.df_gxys['group_no'].iloc[self.ind_target] == 1, 'Problem!'
+            assert self.df_gxys['group_no'].iloc[self.ind_target] == 1, \
+                'Problem!'
         assert np.sum(
             (self.df_gxys['density'] >= self.delta_outer) &
             (self.df_gxys['group_no'] == 0)) == 0, 'Problem!'
@@ -161,8 +183,14 @@ class TDENCLOSER(
 
             plt.savefig(self.file + '.pdf')
 
-        print('Found %u groups in %.1f seconds' % (
-            len(np.unique(self.df_gxys['group_no'])), time.time() - self.start))
+        num_groups = len(
+            self.df_gxys
+            .loc[lambda x: x['group_no'] > 0, 'group_no']
+            .drop_duplicates())
+
+        print(
+            f'Found {num_groups} groups in '
+            f'{(time.time() - self.start):.1f} seconds')
 
         self._assign_group_mems()
 

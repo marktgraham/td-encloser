@@ -9,12 +9,15 @@ import matplotlib.pyplot as plt
 class BaseFirstPass(abc.ABC):
 
     def _create_new_group(self, i, row, min_group_no):
-        self.df_gxys.loc[i, 'group_no'] = np.max(self.df_gxys['group_no']) + 1
+        self.df_gxys.loc[i, 'group_no'] = self.df_gxys['group_no'].max() + 1
         self.df_gxys.loc[i, 'group_peak'] = True
 
         if self.plot == 'verbose':
-            if ((np.abs(row['x']) <= 2) & (np.abs(row['y']) <= 2)) | (not cap):
-                self.title = 'First Pass: %u Groups Found' % len(np.unique(self.df_gxys['group_no']))
+            if ((row['x'].abs() <= 2) & (row['y'].abs() <= 2)) | (not cap):
+                self.title = (
+                    "First Pass: "
+                    f"{len(self.df_gxys['group_no'].drop_duplicates())} "
+                    "Groups Found")
                 self.plot_groups(
                     x1=row['x'],
                     y1=row['y'],
@@ -32,7 +35,7 @@ class BaseFirstPass(abc.ABC):
             else:
                 ww = (
                     (self.df_gxys['group_no'] > min_group_no) &
-                    (self.df_gxys['group_peak'] == True))
+                    (self.df_gxys['group_peak'] is True))
                 dist = np.sqrt(
                     (row['x'] - self.df_gxys.loc[ww, 'x']) ** 2 +
                     (row['y'] - self.df_gxys.loc[ww, 'y']) ** 2).values
@@ -40,17 +43,24 @@ class BaseFirstPass(abc.ABC):
                 contour_group = np.zeros_like(dist)
 
                 for j, row2 in (
-                        self.df_gxys[ww].iloc[inds].reset_index(drop=True).iterrows()):
+                        self.df_gxys
+                        .loc[ww]
+                        .iloc[inds]
+                        .reset_index(drop=True)
+                        .iterrows()):
                     if j < 10:       # Only check nearest 10 groups
                         samples = int(max(
-                            np.ceil(
-                                (600 * dist[inds][j] * (dist[inds][j] + 1)** -2)),
-                                2.0))
+                            np.ceil((
+                                600 * dist[inds][j] *
+                                (dist[inds][j] + 1) ** -2)),
+                            2.0))
                         spacing = dist[inds][j] / samples
 
-                        ff_mid = np.array([self.spline(
-                            row['x'] + (row2['x'] - row['x']) * p,
-                            row['y'] + (row2['y'] - row['y']) * p)[0][0] for p in np.linspace(0.0, 1.0, samples)]).round(5)
+                        ff_mid = np.array([
+                            self.spline(
+                                row['x'] + (row2['x'] - row['x']) * p,
+                                row['y'] + (row2['y'] - row['y']) * p)[0][0]
+                            for p in np.linspace(0.0, 1.0, samples)]).round(5)
 
                         w = ff_mid <= np.round(row2['density'], 5)
 
@@ -65,8 +75,9 @@ class BaseFirstPass(abc.ABC):
                             grad_check = max(int(float('{:.0f}'.format(
                                 0.1 / spacing))), 1)
 
-                            ff_mid_diff = ff_mid[wwww][grad_check:] - \
-                                          ff_mid[wwww][:-grad_check]
+                            ff_mid_diff = (
+                                ff_mid[wwww][grad_check:] -
+                                ff_mid[wwww][:-grad_check])
 
                         else:
                             ff_mid_diff = np.array(
@@ -102,7 +113,7 @@ class BaseFirstPass(abc.ABC):
                 if self.plot == 'verbose':
                     if (
                             (np.abs(row['x']) <= 2) &
-                            (np.abs(row['y']) <= 2)) | (cap == False):
+                            (np.abs(row['y']) <= 2)) | (cap is False):
                         self.title = 'First Pass: %u Groups Found' % len(
                             np.unique(self.df_gxys['group_no']))
                         self.plot_groups(

@@ -26,12 +26,14 @@ class BaseTDENCLOSER(abc.ABC):
             target=True,
             mono=0):
 
-        assert plot in [False, 'quick', 'verbose'], 'plot is False, quick or verbose'
+        assert plot in [False, 'quick', 'verbose'], \
+            'plot is False, quick or verbose'
 
         '''
         Routine to find groups using the hopping method.
-        We want to know which galaxies are in the same group as the target galaxy.
-        group_no = 1 if galaxy belongs to the same group as the target galaxy
+        We want to know which galaxies are in the same group as the target
+        galaxy. group_no = 1 if galaxy belongs to the same group as the target
+        galaxy.
 
         :param plot: If true, plots what's going on
         :return:
@@ -83,7 +85,10 @@ class BaseTDENCLOSER(abc.ABC):
     @functools.lru_cache()
     def ind_target(self):
         # need to check this
-        return self.df_gxys.loc[lambda x: x['density_rank'] == x['density_rank'].max()].index
+        return (
+            self.df_gxys
+            .loc[lambda x: x['density_rank'] == x['density_rank'].max()]
+            .index)
 
     @property
     @functools.lru_cache()
@@ -99,7 +104,9 @@ class BaseTDENCLOSER(abc.ABC):
                 501)
         })
 
-        df_grid['density'] = df_grid.apply(self._calculate_density_at_location, axis=1)
+        df_grid['density'] = df_grid.apply(
+            self._calculate_density_at_location,
+            axis=1)
 
         return df_grid
 
