@@ -1,3 +1,4 @@
+import abc
 import pandas
 import numpy
 import matplotlib.pyplot as plt
@@ -7,9 +8,14 @@ from scipy.interpolate import RectBivariateSpline
 from td_encloser import TDENCLOSER, gaussian_kde
 
 
-class TestTDENCLOSER:
+class BaseTestTDENCLOSER(abc.ABC):
 
-    def _generate_kde_field(self, x, y, box_size):
+    @abc.abstractmethod
+    def setup(self):
+        raise NotImplementedError()
+
+    @staticmethod
+    def _generate_kde_field(x, y, box_size):
         xmin, xmax, ymin, ymax = -box_size, box_size, -box_size, box_size
 
         grid_size = box_size * 15 + 1
@@ -34,73 +40,6 @@ class TestTDENCLOSER:
 
         return xx, yy, f
 
-    def test_gaussian(self):
-        """ Method to test the density field. """
-
-        df = pandas.DataFrame({'x': [0, 0.3], 'y': [0, 0]})
-
-        arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 10)
-
-        spline = RectBivariateSpline(
-            numpy.unique(arr_x), numpy.unique(arr_y), ff)
-
-        density_zero = spline(0, 0)[0][0]
-
-        numpy.testing.assert_almost_equal(density_zero, 1.60653, decimal=5)
-
-    def test_td_encloser_on_simulated_catalogue(self):
-        numpy.random.seed(42)
-        num = 40
-        rad = 0.4
-
-        df = pandas.DataFrame({
-            'x': numpy.hstack((
-                numpy.random.uniform(-rad, rad, num) - 1.5,
-                numpy.random.uniform(-rad, rad, int(num * 0.3)),
-                numpy.random.uniform(-5, 5, 150))),
-            'y': numpy.hstack((
-                numpy.random.uniform(-rad, rad, num) + 0.2,
-                numpy.random.uniform(-rad, rad, int(num * 0.3)),
-                numpy.random.uniform(-5, 5, 150)))})
-
-        arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 10)
-
-        spline = RectBivariateSpline(
-            numpy.unique(arr_x), numpy.unique(arr_y), ff)
-
-        td_encloser = TDENCLOSER(
-            df['x'].values, df['y'].values, spline,
-
-            plot=False, mono=-0.01, target=False)
-
-        results = td_encloser.find_groups()
-
-        self._check_group_members(
-            results, group1=50, group2=14, group3=6, group4=5)
-
-        self.plot_results(results, arr_x, arr_y, ff)
-
-    def _test_td_encloser_on_mock_catalogue(self):
-        """ Method to test TD-ENCLOSER. """
-
-        df = pandas.read_csv('data/processed/Mock_galaxy_catalogue_test.csv')
-
-        arr_x, arr_y, ff = self._generate_kde_field(df['x'], df['y'], 50)
-
-        spline = RectBivariateSpline(
-            numpy.unique(arr_x), numpy.unique(arr_y), ff)
-
-        td_encloser = TDENCLOSER(
-            df['x'].values, df['y'].values, spline,
-            plot=False, mono=-0.01, target=False)
-
-        results = td_encloser.find_groups()
-
-        self._check_group_members(
-            results=results, group1=36, group2=30, group3=33, group4=31)
-
-        self.plot_results(results)
-
     def _check_group_members(self, results, **kwargs):
 
         for group in kwargs:
@@ -111,13 +50,12 @@ class TestTDENCLOSER:
                     lambda x: x['group_no'] == group_no, 'group_mem'].iloc[0] \
                         == group_mem_test
             except AssertionError:
-                print(results.loc[lambda x: (x['group_peak'] == 1) & (x['group_no'] == group_no)])
+                print(
+                    results.loc[lambda x: (
+                        (x['group_peak'] == 1) &
+                        (x['group_no'] == group_no))])
 
-    def plot_results(self, df, arr_x, arr_y, ff):
-
-        group_members = df['group_no'].value_counts()
-
-        df_top_4 = df.loc[lambda x: ((x['group_no'] <= 4) & (x['group_no'] > 0))]
+    def _plot_results(self, df, arr_x, arr_y, ff):
 
         group_peaks = (
             df
@@ -139,15 +77,27 @@ class TestTDENCLOSER:
                 .loc[lambda x: abs(x['x'] - group['x']) <= 3]
                 .loc[lambda x: abs(x['y'] - group['y']) <= 3])
 
-            for i, group_ in df_box['group_no'].drop_duplicates().reset_index(drop=True).iteritems():
-                for color, edgecolor, s in zip([None, f'C{i}'], ['k', None], [50, 40]):
+            for i, group_ in (
+                    df_box['group_no']
+                    .drop_duplicates()
+                    .reset_index(drop=True)
+                    .iteritems()):
+
+                kwargs_plot = [
+                    {'color': None, 'edgecolor': 'k', 's': 70},
+                    {'color': f'C{i}', 'edgecolor': None, 's': 40}]
+
+                for kwargs in kwargs_plot:
                     ax.scatter(
                         df_box.loc[lambda x: (x['group_no'] == group_), 'x'],
                         df_box.loc[lambda x: (x['group_no'] == group_), 'y'],
-                        color=color,
-                        s=s)
+                        **kwargs)
 
-                ax.set_title(f"{group_members.loc[group['group_no']]} members", fontsize=16)
+                num_mems = group_peaks.loc[
+                    lambda x: x['group_no'] == group['group_no'],
+                    'group_mem'].item()
+
+                ax.set_title(f"{num_mems} members", fontsize=16)
 
             ax.contour(
                 arr_x, arr_y, ff,
@@ -158,3 +108,88 @@ class TestTDENCLOSER:
 
         plt.tight_layout()
         plt.pause(20)
+
+    def test_td_encloser(self, **kwargs):
+
+        arr_x, arr_y, ff = self._generate_kde_field(
+            self.df['x'], self.df['y'], self.box_size)
+
+        spline = RectBivariateSpline(
+            numpy.unique(arr_x), numpy.unique(arr_y), ff)
+
+        td_encloser = TDENCLOSER(
+            self.df['x'].values, self.df['y'].values, spline,
+            plot=False, mono=-0.01, target=False)
+
+        results = td_encloser.find_groups()
+
+        self._check_group_members(
+            results, **kwargs)
+
+        self._plot_results(results, arr_x, arr_y, ff)
+
+
+class TestGaussian():
+    """ Class to test the Gaussian KDE. """
+
+    def setup(self):
+
+        self.df = pandas.DataFrame({'x': [0, 0.3], 'y': [0, 0]})
+
+    def _generate_kde_field(self, **kwargs):
+        return BaseTestTDENCLOSER._generate_kde_field(**kwargs)
+
+    def test_gaussian(self):
+        """ Method to test the density field. """
+
+        arr_x, arr_y, ff = self._generate_kde_field(
+            x=self.df['x'], y=self.df['y'], box_size=10)
+
+        spline = RectBivariateSpline(
+            numpy.unique(arr_x), numpy.unique(arr_y), ff)
+
+        density_zero = spline(0, 0)[0][0]
+
+        numpy.testing.assert_almost_equal(density_zero, 1.60653, decimal=5)
+
+
+class TestOnSimulatedCatalogue(BaseTestTDENCLOSER):
+    """ Class to test TD-ENCLOSER on a simulated catalogue. """
+
+    def setup(self):
+
+        numpy.random.seed(42)
+        num = 40
+        rad = 0.4
+
+        self.df = pandas.DataFrame({
+            'x': numpy.hstack((
+                numpy.random.uniform(-rad, rad, num) - 1.5,
+                numpy.random.uniform(-rad, rad, int(num * 0.3)),
+                numpy.random.uniform(-5, 5, 150))),
+            'y': numpy.hstack((
+                numpy.random.uniform(-rad, rad, num) + 0.2,
+                numpy.random.uniform(-rad, rad, int(num * 0.3)),
+                numpy.random.uniform(-5, 5, 150)))})
+
+        # box_size radius in Mpc
+        self.box_size = 10
+
+    def test_td_encloser(self):
+        super().test_td_encloser(
+            group1=50, group2=14, group3=6, group4=5)
+
+
+class TestOnMockCatalogue(BaseTestTDENCLOSER):
+    """ Class to test TD-ENCLOSER on a mock catalogue. """
+
+    def setup(self):
+
+        self.df = pandas.read_csv(
+            'data/processed/Mock_galaxy_catalogue_test.csv')
+
+        self.box_size = 50
+
+    def test_td_encloser(self):
+        super().test_td_encloser(
+            group1=36, group2=33, group3=31, group4=30)
