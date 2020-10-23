@@ -28,7 +28,7 @@ class BaseFirstPass(abc.ABC):
         for i, row in (
                 self.df_gxys
                 .loc[selection]
-                .loc[lambda x: x['density' >= self.delta_outer]]
+                .loc[lambda x: x['density'] >= self.delta_outer]
                 .iterrows()):
             # If no groups above min_group_no exist
             if not len(self.df_gxys[self.df_gxys['group_no'] > min_group_no]):
