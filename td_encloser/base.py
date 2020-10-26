@@ -8,8 +8,10 @@ import matplotlib.pyplot as plt
 
 
 class BaseTDENCLOSER(abc.ABC):
+    """ Base class for TD-ENCLOSER. """
 
     def _calculate_density_at_location(self, location):
+        """ Method to return the density at a location. """
         return self.spline(location['x'], location['y'])
 
     def __init__(
@@ -26,12 +28,14 @@ class BaseTDENCLOSER(abc.ABC):
             target=True,
             mono=0):
 
-        assert plot in [False, 'quick', 'verbose'], 'plot is False, quick or verbose'
+        assert plot in [False, 'quick', 'verbose'], \
+            'plot is False, quick or verbose'
 
         '''
         Routine to find groups using the hopping method.
-        We want to know which galaxies are in the same group as the target galaxy.
-        group_no = 1 if galaxy belongs to the same group as the target galaxy
+        We want to know which galaxies are in the same group as the target
+        galaxy. group_no = 1 if galaxy belongs to the same group as the target
+        galaxy.
 
         :param plot: If true, plots what's going on
         :return:
@@ -59,6 +63,8 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def df_gxys(self):
+        """ Method to return a DataFrame representation of the galaxy
+        catalogue. """
         df_gxys = pd.DataFrame({'x': self.xx, 'y': self.yy})
 
         # Calculate density at each galaxy
@@ -82,12 +88,17 @@ class BaseTDENCLOSER(abc.ABC):
     @property
     @functools.lru_cache()
     def ind_target(self):
+        """ Method to return the index of the target galaxy. """
         # need to check this
-        return self.df_gxys.loc[lambda x: x['density_rank'] == x['density_rank'].max()].index
+        return (
+            self.df_gxys
+            .loc[lambda x: x['density_rank'] == x['density_rank'].max()]
+            .index)
 
     @property
     @functools.lru_cache()
     def df_grid(self):
+        """ Method to return a DataFrame of a grid for contours. """
         df_grid = pd.DataFrame({
             'x': np.linspace(
                 np.round(np.min(self.df_gxys['x'])).astype(int),
@@ -99,17 +110,18 @@ class BaseTDENCLOSER(abc.ABC):
                 501)
         })
 
-        df_grid['density'] = df_grid.apply(self._calculate_density_at_location, axis=1)
+        df_grid['density'] = df_grid.apply(
+            self._calculate_density_at_location,
+            axis=1)
 
         return df_grid
 
     @property
     @functools.lru_cache()
     def df_contours(self):
+        """ Method to return a DataFrame of density. """
         # rotate grid for contours
         yyy, xxx = np.meshgrid(self.df_grid['x'], self.df_grid['y'])
-
-        breakpoint()
 
         return pd.DataFrame({
             'x': xxx.ravel(),
