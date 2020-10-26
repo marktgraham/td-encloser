@@ -36,7 +36,7 @@ class BaseFirstPass(abc.ABC):
         inds = np.argsort(dist)
         contour_group = np.zeros_like(dist)
 
-        for j, row2 in (
+        for j, group_peak in (
                 self.df_gxys
                 .loc[group_peaks]
                 .iloc[inds]
@@ -53,11 +53,11 @@ class BaseFirstPass(abc.ABC):
 
                 ff_mid = np.array([
                     self.spline(
-                        row['x'] + (row2['x'] - row['x']) * p,
-                        row['y'] + (row2['y'] - row['y']) * p)[0][0]
+                        row['x'] + (group_peak['x'] - row['x']) * p,
+                        row['y'] + (group_peak['y'] - row['y']) * p)[0][0]
                     for p in np.linspace(0.0, 1.0, samples)]).round(5)
 
-                ff_lower_mid = ff_mid <= np.round(row2['density'], 5)
+                ff_lower_mid = ff_mid <= np.round(group_peak['density'], 5)
 
                 # TODO: This check is now throwing up an error
                 #     assert np.sum(w) > 1, 'Not enough samples'
@@ -84,7 +84,7 @@ class BaseFirstPass(abc.ABC):
                             cap &
                             (np.min(ff_mid_diff) >= self.mono) &
                             (np.min(ff_mid) >= self.delta_outer) &
-                            (np.max(ff_mid) < 2 * row2['density'])) |
+                            (np.max(ff_mid) < 2 * group_peak['density'])) |
                         (
                             (not cap) &
                             (np.min(ff_mid_diff) >= self.mono / 10) &
@@ -117,8 +117,8 @@ class BaseFirstPass(abc.ABC):
                 self.plot_groups(
                     x1=row['x'],
                     y1=row['y'],
-                    x2=row2['x'],
-                    y2=row2['y'],
+                    x2=group_peak['x'],
+                    y2=group_peak['y'],
                     alpha_group=min_group_no)
 
     def run_first_pass(self, selection, min_group_no, cap=True):
