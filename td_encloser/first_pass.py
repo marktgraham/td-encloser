@@ -40,58 +40,58 @@ class BaseFirstPass(abc.ABC):
                 self.df_gxys
                 .loc[group_peaks]
                 .iloc[inds]
-                .reset_index(drop=True)
+                # Only check nearest 10 groups
+                .reset_index(drop=True)[:10]
                 .iterrows()):
 
-            if j < 10:       # Only check nearest 10 groups
-                samples = int(max(
-                    np.ceil((
-                        600 * dist[inds][j] *
-                        (dist[inds][j] + 1) ** -2)),
-                    2.0))
-                spacing = dist[inds][j] / samples
+            samples = int(max(
+                np.ceil((
+                    600 * dist[inds][j] *
+                    (dist[inds][j] + 1) ** -2)),
+                2.0))
+            spacing = dist[inds][j] / samples
 
-                ff_mid = np.array([
-                    self.spline(
-                        row['x'] + (group_peak['x'] - row['x']) * p,
-                        row['y'] + (group_peak['y'] - row['y']) * p)[0][0]
-                    for p in np.linspace(0.0, 1.0, samples)]).round(5)
+            ff_mid = np.array([
+                self.spline(
+                    row['x'] + (group_peak['x'] - row['x']) * p,
+                    row['y'] + (group_peak['y'] - row['y']) * p)[0][0]
+                for p in np.linspace(0.0, 1.0, samples)]).round(5)
 
-                ff_lower_mid = ff_mid <= np.round(group_peak['density'], 5)
+            ff_lower_mid = ff_mid <= np.round(group_peak['density'], 5)
 
-                # TODO: This check is now throwing up an error
-                #     assert np.sum(w) > 1, 'Not enough samples'
+            # TODO: This check is now throwing up an error
+            #     assert np.sum(w) > 1, 'Not enough samples'
 
-                if not cap:
-                    ff_lower_mid = \
-                        np.ones_like(ff_lower_mid).astype(bool)
+            if not cap:
+                ff_lower_mid = \
+                    np.ones_like(ff_lower_mid).astype(bool)
 
-                if len(ff_mid[ff_lower_mid]) * spacing > 0.1 + spacing:
-                    grad_check = max(int(float('{:.0f}'.format(
-                        0.1 / spacing))), 1)
+            if len(ff_mid[ff_lower_mid]) * spacing > 0.1 + spacing:
+                grad_check = max(int(float('{:.0f}'.format(
+                    0.1 / spacing))), 1)
 
-                    ff_mid_diff = (
-                        ff_mid[ff_lower_mid][grad_check:] -
-                        ff_mid[ff_lower_mid][:-grad_check])
+                ff_mid_diff = (
+                    ff_mid[ff_lower_mid][grad_check:] -
+                    ff_mid[ff_lower_mid][:-grad_check])
 
-                else:
-                    ff_mid_diff = np.array([
-                        ff_mid[ff_lower_mid][-1] -
-                        ff_mid[ff_lower_mid][0]])
+            else:
+                ff_mid_diff = np.array([
+                    ff_mid[ff_lower_mid][-1] -
+                    ff_mid[ff_lower_mid][0]])
 
-                if (
-                        (
-                            cap &
-                            (np.min(ff_mid_diff) >= self.mono) &
-                            (np.min(ff_mid) >= self.delta_outer) &
-                            (np.max(ff_mid) < 2 * group_peak['density'])) |
-                        (
-                            (not cap) &
-                            (np.min(ff_mid_diff) >= self.mono / 10) &
-                            (np.min(ff_mid) >= self.delta_outer))):
+            if (
+                    (
+                        cap &
+                        (np.min(ff_mid_diff) >= self.mono) &
+                        (np.min(ff_mid) >= self.delta_outer) &
+                        (np.max(ff_mid) < 2 * group_peak['density'])) |
+                    (
+                        (not cap) &
+                        (np.min(ff_mid_diff) >= self.mono / 10) &
+                        (np.min(ff_mid) >= self.delta_outer))):
 
-                    contour_group[j] = 1
-                    break
+                contour_group[j] = 1
+                break
 
         if (np.max(contour_group) < 0) | (np.max(contour_group) > 1):
             print('debug')
