@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 
 class BasePlotting(abc.ABC):
-    """ Class holding methods to produce pretty plotsss. """
+    """ Class holding methods to produce pretty plots. """
 
     def plot_groups(
             self,
