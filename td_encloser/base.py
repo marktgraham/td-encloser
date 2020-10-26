@@ -123,8 +123,6 @@ class BaseTDENCLOSER(abc.ABC):
         # rotate grid for contours
         yyy, xxx = np.meshgrid(self.df_grid['x'], self.df_grid['y'])
 
-        breakpoint()
-
         return pd.DataFrame({
             'x': xxx.ravel(),
             'y': yyy.ravel(),
