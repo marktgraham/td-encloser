@@ -49,8 +49,9 @@ class BaseTestTDENCLOSER(abc.ABC):
                 assert results.loc[
                     lambda x: x['group_no'] == group_no, 'group_mem'].iloc[0] \
                         == group_mem_test
+
             except AssertionError:
-                print(
+                raise ValueError(
                     results.loc[lambda x: (
                         (x['group_peak'] == 1) &
                         (x['group_no'] == group_no))])
