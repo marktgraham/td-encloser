@@ -25,7 +25,7 @@ class BaseFirstPass(abc.ABC):
                     y1=row['y'],
                     alpha_group=min_group_no)
 
-    def _assign_to_existing_group(self, i, row, min_group_no, cap):
+    def _assign_to_existing_group(self, i, galaxy, min_group_no, cap):
         """ Method to assign a galaxy to an existing group. """
         # select galaxies which are at a group peak
         group_peaks = (
@@ -39,8 +39,8 @@ class BaseFirstPass(abc.ABC):
             .assign(
                 # calculate distance from each peak to the galaxy
                 dist_to_gxy=lambda group_peak: np.sqrt(
-                    (row['x'] - group_peak['x']) ** 2 +
-                    (row['y'] - group_peak['y']) ** 2),
+                    (galaxy['x'] - group_peak['x']) ** 2 +
+                    (galaxy['y'] - group_peak['y']) ** 2),
                 # create dummy variable
                 contour_group=0)
             # sort peaks by distance from galaxy in order of nearest to
@@ -67,8 +67,8 @@ class BaseFirstPass(abc.ABC):
 
             ff_mid = np.array([
                 self.spline(
-                    row['x'] + (group_peak['x'] - row['x']) * p,
-                    row['y'] + (group_peak['y'] - row['y']) * p)[0][0]
+                    galaxy['x'] + (group_peak['x'] - galaxy['x']) * p,
+                    galaxy['y'] + (group_peak['y'] - galaxy['y']) * p)[0][0]
                 for p in np.linspace(0.0, 1.0, group_peak['samples'])]).round(5)
 
             ff_lower_mid = ff_mid <= np.round(group_peak['density'], 5)
@@ -120,19 +120,19 @@ class BaseFirstPass(abc.ABC):
                     lambda x: x['contour_group'] == 1, 'group_no'].item()
         else:
             # No connecting groups found
-            self._create_new_group(i, row, min_group_no)
+            self._create_new_group(i, galaxy, min_group_no)
 
         if self.plot == 'verbose':
             if (
-                    (np.abs(row['x']) <= 2) &
-                    (np.abs(row['y']) <= 2)) | (cap is False):
+                    (np.abs(galaxy['x']) <= 2) &
+                    (np.abs(galaxy['y']) <= 2)) | (cap is False):
                 self.title = (
                     'First Pass: '
                     f"{len(self.df_gxys['group_no'].drop_duplicates())} "
                     'Groups Found')
                 self.plot_groups(
-                    x1=row['x'],
-                    y1=row['y'],
+                    x1=galaxy['x'],
+                    y1=galaxy['y'],
                     x2=group_peak['x'],
                     y2=group_peak['y'],
                     alpha_group=min_group_no)
