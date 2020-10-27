@@ -27,35 +27,49 @@ class BaseFirstPass(abc.ABC):
 
     def _assign_to_existing_group(self, i, row, min_group_no, cap):
         """ Method to assign a galaxy to an existing group. """
+        # select galaxies which are at a group peak
         group_peaks = (
             (self.df_gxys['group_no'] > min_group_no) &
             (self.df_gxys['group_peak']))
-        dist = np.sqrt(
-            (row['x'] - self.df_gxys.loc[group_peaks, 'x']) ** 2 +
-            (row['y'] - self.df_gxys.loc[group_peaks, 'y']) ** 2).values
-        inds = np.argsort(dist)
-        contour_group = np.zeros_like(dist)
 
-        for j, group_peak in (
-                self.df_gxys
-                .loc[group_peaks]
-                .iloc[inds]
-                # Only check nearest 10 groups
-                .reset_index(drop=True)[:10]
-                .iterrows()):
+        # construct DataFrame
+        df_group_peaks = (
+            self.df_gxys
+            .loc[group_peaks]
+            .assign(
+                # calculate distance from each peak to the galaxy
+                dist_to_gxy=lambda group_peak: np.sqrt(
+                    (row['x'] - group_peak['x']) ** 2 +
+                    (row['y'] - group_peak['y']) ** 2),
+                # create dummy variable
+                contour_group=0)
+            # sort peaks by distance from galaxy in order of nearest to
+            # furthest
+            .sort_values('dist_to_gxy')
+            .reset_index(drop=True))
 
-            samples = int(max(
+        # calculate number of samples along which the density is taken along
+        # the connecting line between a peak and the galaxy
+        df_group_peaks['samples'] = df_group_peaks.apply(
+            lambda group_peak: int(max(
                 np.ceil((
-                    600 * dist[inds][j] *
-                    (dist[inds][j] + 1) ** -2)),
-                2.0))
-            spacing = dist[inds][j] / samples
+                    600 * group_peak['dist_to_gxy'] *
+                    (group_peak['dist_to_gxy'] + 1) ** -2)),
+                2.0)), axis=1)
+
+        # calculate the spacing between density samples
+        df_group_peaks['spacing'] = (
+            df_group_peaks['dist_to_gxy'] /
+            df_group_peaks['samples'])
+
+        # Only check nearest 10 groups
+        for j, group_peak in df_group_peaks[:10].iterrows():
 
             ff_mid = np.array([
                 self.spline(
                     row['x'] + (group_peak['x'] - row['x']) * p,
                     row['y'] + (group_peak['y'] - row['y']) * p)[0][0]
-                for p in np.linspace(0.0, 1.0, samples)]).round(5)
+                for p in np.linspace(0.0, 1.0, group_peak['samples'])]).round(5)
 
             ff_lower_mid = ff_mid <= np.round(group_peak['density'], 5)
 
@@ -63,12 +77,13 @@ class BaseFirstPass(abc.ABC):
             #     assert np.sum(w) > 1, 'Not enough samples'
 
             if not cap:
-                ff_lower_mid = \
-                    np.ones_like(ff_lower_mid).astype(bool)
+                ff_lower_mid = np.ones_like(ff_lower_mid).astype(bool)
 
-            if len(ff_mid[ff_lower_mid]) * spacing > 0.1 + spacing:
+            if (
+                    len(ff_mid[ff_lower_mid]) * group_peak['spacing'] >
+                    0.1 + group_peak['spacing']):
                 grad_check = max(int(float('{:.0f}'.format(
-                    0.1 / spacing))), 1)
+                    0.1 / group_peak['spacing']))), 1)
 
                 ff_mid_diff = (
                     ff_mid[ff_lower_mid][grad_check:] -
@@ -90,21 +105,22 @@ class BaseFirstPass(abc.ABC):
                         (np.min(ff_mid_diff) >= self.mono / 10) &
                         (np.min(ff_mid) >= self.delta_outer))):
 
-                contour_group[j] = 1
+                df_group_peaks.loc[j, 'contour_group'] = 1
                 break
 
-        if (np.max(contour_group) < 0) | (np.max(contour_group) > 1):
+        if (
+                (np.max(df_group_peaks['contour_group']) < 0) |
+                (np.max(df_group_peaks['contour_group']) > 1)):
             print('debug')
 
-        # No connecting groups found
-        if np.max(contour_group) == 0:
+        if not df_group_peaks.loc[lambda x: x['contour_group'] == 1].empty:
+            # One connecting group found
+            self.df_gxys.loc[i, 'group_no'] = \
+                df_group_peaks.loc[
+                    lambda x: x['contour_group'] == 1, 'group_no'].item()
+        else:
+            # No connecting groups found
             self._create_new_group(i, row, min_group_no)
-        # One connecting group found
-        elif np.max(contour_group) == 1:
-            max_contour_group = contour_group == 1
-            self.df_gxys.loc[i, 'group_no'] = (
-                self.df_gxys.loc[group_peaks, 'group_no'].iloc[inds]
-                .values[np.min(np.where(max_contour_group)[0])])
 
         if self.plot == 'verbose':
             if (
