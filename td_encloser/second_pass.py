@@ -52,22 +52,22 @@ class BaseSecondPass(abc.ABC):
                                 y1=row['y'],
                                 x2=(
                                     self.df_gxys['x']
-                                    .iloc[inds][:self.n_merge]
+                                    .loc[inds][:self.n_merge]
                                     .iloc[near_max]),
                                 y2=(
                                     self.df_gxys['y']
-                                    .iloc[inds][:self.n_merge]
+                                    .loc[inds][:self.n_merge]
                                     .iloc[near_max]))
 
                     dist_x = (
                         self.df_gxys['x']
-                        .iloc[inds]
+                        .loc[inds]
                         [:self.n_merge]
                         .iloc[near_max]) - galaxy['x']
 
                     dist_y = (
                         self.df_gxys['y']
-                        .iloc[inds]
+                        .loc[inds]
                         [:self.n_merge]
                         .iloc[near_max]) - galaxy['y']
 
