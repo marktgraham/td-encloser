@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name='td-encloser',
-    version='0.0.4',
+    version='0.0.5',
     description='A set of tools to optimise the allocation of counterparties.',
     author='Mark Graham',
     license='MIT License',
