@@ -7,7 +7,58 @@ import matplotlib.pyplot as plt
 
 
 class BaseSecondPass(abc.ABC):
-    """ Class holding methods to run the seconddd pass. """
+    """ Class holding methods to run the second pass. """
+
+    def _eject_galaxy_if_below_density_midpoint(
+            self, i, galaxy, df_neighbour_groups):
+        """ Method to eject galaxy if below the density midpoint. """
+        df_near_max = (
+            df_neighbour_groups
+            .loc[lambda x: x['density'] == x['density'].max()])
+
+        if self.plot == 'verbose':
+            self.title = 'Second Pass: Chopping Border Galaxies...'
+            if (galaxy['x'].abs() <= 2) & (galaxy['y'].abs() <= 2):
+                self.plot_groups(
+                    x1=galaxy['x'],
+                    y1=galaxy['y'],
+                    x2=df_near_max['x'],
+                    y2=df_near_max['y]'])
+
+        dist_from_galaxy_to_max = {
+            'x': df_near_max['x'] - galaxy['x'],
+            'y': df_near_max['y'] - galaxy['y']}
+
+        ff_mid = np.array([
+            self.spline(
+                galaxy['x'] + dist_from_galaxy_to_max['x'] * p,
+                galaxy['y'] + dist_from_galaxy_to_max['y'] * p)[0][0]
+            for p in np.linspace(0.0, 1.0, 11)])
+
+        if (
+                np.mean([np.min(ff_mid), df_near_max['density']])
+                < self.delta_saddle):
+            self.df_gxys.loc[i, 'group_no'] = 0
+
+    def _check_if_neighbours_in_different_group(self, i, galaxy):
+        """ Method to check if one or more neighbours is in a different group.
+        """
+        df_sorted_by_distance = (
+            self.df_gxys
+            .copy()
+            .assign(
+                dist=lambda x: np.sqrt(
+                    (galaxy['x'] - x['x']) ** 2 +
+                    (galaxy['y'] - x['y']) ** 2))
+            .sort_values('dist'))
+
+        df_neighbour_groups = df_sorted_by_distance[:self.n_merge]
+
+        # If at least one of the nearest n_merge - 1 neighbours is in
+        # a different group...
+        if not df_neighbour_groups.loc[lambda x: x['group_no'] != 0].empty:
+            self._eject_galaxy_if_below_density_midpoint(
+                i, galaxy, df_neighbour_groups)
 
     def run_second_pass(self):
         """ Method to run the second pass. """
@@ -28,48 +79,7 @@ class BaseSecondPass(abc.ABC):
                 'remaining galaxies to existing groups...')
             # Second pass: see if they can join existing groups
             for i, galaxy in df_between_delta_outer_delta_saddle.iterrows():
-                df_sorted_by_distance = (
-                    self.df_gxys
-                    .copy()
-                    .assign(
-                        dist=lambda x: np.sqrt(
-                            (galaxy['x'] - x['x']) ** 2 +
-                            (galaxy['y'] - x['y']) ** 2))
-                    .sort_values('dist'))
-
-                df_neighbour_groups = df_sorted_by_distance[:self.n_merge]
-
-                # If at least one of the nearest n_merge - 1 neighbours is in
-                # a different group...
-                if not df_neighbour_groups.loc[lambda x: x['group_no'] != 0].empty:
-
-                    df_near_max = (
-                        df_neighbour_groups
-                        .loc[lambda x: x['density'] == x['density'].max()])
-
-                    if self.plot == 'verbose':
-                        self.title = 'Second Pass: Chopping Border Galaxies...'
-                        if (galaxy['x'].abs() <= 2) & (galaxy['y'].abs() <= 2):
-                            self.plot_groups(
-                                x1=galaxy['x'],
-                                y1=galaxy['y'],
-                                x2=df_near_max['x'],
-                                y2=df_near_max['y]'])
-
-                    dist_from_galaxy_to_max = {
-                        'x': df_near_max['x'] - galaxy['x'],
-                        'y': df_near_max['y'] - galaxy['y']}
-
-                    ff_mid = np.array([
-                        self.spline(
-                            galaxy['x'] + dist_from_galaxy_to_max['x'] * p,
-                            galaxy['y'] + dist_from_galaxy_to_max['y'] * p)[0][0]
-                        for p in np.linspace(0.0, 1.0, 11)])
-
-                    if (
-                            np.mean([np.min(ff_mid), df_near_max['density']])
-                            < self.delta_saddle):
-                        self.df_gxys.loc[i, 'group_no'] = 0
+                self._check_if_neighbours_in_different_group(i, galaxy)
 
             if self.target:
                 if self.df_gxys['group_no'].iloc[self.ind_0] == 1:
