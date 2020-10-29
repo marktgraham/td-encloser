@@ -13,36 +13,31 @@ class BaseSecondPass(abc.ABC):
         """ Method to run the second pass. """
         # For groups above delta saddle, select galaxies between delta outer
         # and delta saddle
-        between_delta_outer_delta_saddle = (
-            (self.df_gxys['density'] >= self.delta_outer) &
-            (self.df_gxys['density'] < self.delta_saddle) &
-            np.isin(self.df_gxys['group_no'], self.df_gxys.loc[
-                (self.df_gxys['density'] >= self.delta_peak) &
-                (self.df_gxys['group_peak'] == 1), 'group_no']))
+        df_between_delta_outer_delta_saddle = (
+            self.df_gxys
+            .loc[lambda x: x['density'] >= self.delta_outer]
+            .loc[lambda x: x['density'] < self.delta_saddle]
+            .loc[lambda x: x['group_no'].isin(
+                self.df_gxys.loc[
+                    (self.df_gxys['density'] >= self.delta_peak) &
+                    (self.df_gxys['group_peak'] == 1), 'group_no'])])
 
-        if between_delta_outer_delta_saddle.sum():  # If such galaxies exist
+        if not df_between_delta_outer_delta_saddle.empty:  # If such galaxies exist
             print(
-                f'Attempting to add {between_delta_outer_delta_saddle.sum()} '
+                f'Attempting to add {len(df_between_delta_outer_delta_saddle)} '
                 'remaining galaxies to existing groups...')
             # Second pass: see if they can join existing groups
-            for i, row in (
-                    self.df_gxys
-                    .loc[between_delta_outer_delta_saddle]
-                    .iterrows()):
+            for i, galaxy in df_between_delta_outer_delta_saddle.iterrows():
                 dist = np.sqrt(
-                    (row['x'] - self.df_gxys['x']) ** 2 +
-                    (row['y'] - self.df_gxys['y']) ** 2)
+                    (galaxy['x'] - self.df_gxys['x']) ** 2 +
+                    (galaxy['y'] - self.df_gxys['y']) ** 2)
                 inds = np.argsort(dist)  # Sort by distance
 
-                neighbours_in_different_group = (
-                    self.df_gxys
-                    ['group_no']
-                    .iloc[inds]
-                    [:self.n_merge] != 0)
+                df_neighbour_groups = self.df_gxys.iloc[inds][:self.n_merge]
 
                 # If at least one of the nearest n_merge - 1 neighbours is in
                 # a different group...
-                if neighbours_in_different_group.sum():
+                if not df_neighbour_groups.loc[lambda x: x['group_no'] != 0].empty:
                     near_max = (
                         self.df_gxys
                         .loc[inds, 'density']
@@ -68,18 +63,18 @@ class BaseSecondPass(abc.ABC):
                         self.df_gxys['x']
                         .iloc[inds]
                         [:self.n_merge]
-                        .iloc[near_max]) - row['x']
+                        .iloc[near_max]) - galaxy['x']
 
                     dist_y = (
                         self.df_gxys['y']
                         .iloc[inds]
                         [:self.n_merge]
-                        .iloc[near_max]) - row['y']
+                        .iloc[near_max]) - galaxy['y']
 
                     ff_mid = np.array([
                         self.spline(
-                            row['x'] + dist_x * p,
-                            row['y'] + dist_y * p)[0][0]
+                            galaxy['x'] + dist_x * p,
+                            galaxy['y'] + dist_y * p)[0][0]
                         for p in np.linspace(0.0, 1.0, 11)])
 
                     ff_density_neighbour_max = np.max(
